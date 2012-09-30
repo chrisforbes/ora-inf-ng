@@ -16,4 +16,10 @@ get '/ping' => method () {
 	$self->render(text => 'It works!');
 };
 
+get '/games' => method () {
+	$redis->get('games' => func ($redis, $res) {
+			$self->render('text' => $res->[0]);
+		});
+};
+
 app->start;
