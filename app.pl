@@ -21,6 +21,7 @@ get '/ping' => method () {
 
 	$redis->set($key => $yaml);
 	$redis->expire($key => TTL());
+	$redis->sadd(active => $key);
 
 	$self->render(text => 'It works!');
 };
