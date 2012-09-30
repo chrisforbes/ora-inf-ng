@@ -9,7 +9,7 @@ my $redis = MojoX::Redis->new(server => '127.0.0.1:6379');
 my $ttl = 300;		# server-side ttl is 5 minutes. client is expected
 					# to ping again at about 60% of ttl.
 
-get '/ping' => method () {
+any '/ping' => method () {
 	my $ip = $self->tx->remote_address;
 	my $port = $self->param('port') // 0;
 	my $new = $self->param('new') // 0;
@@ -32,19 +32,21 @@ get '/games' => method () {
 	});
 };
 
+my $gamelist_lua = q/
+	local active_games = redis.call('smembers','active')
+	local results = {}
+	table.foreach(active_games, function(k,v)
+		local z = redis.call('get',v)
+		if z then
+			table.insert(results, v)
+			table.insert(results, redis.call('ttl',v))
+			table.insert(results, z)
+		end
+	end)
+	return results/;
+
 get '/list' => method () {
-	$redis->execute(eval => [q/
-		local active_games = redis.call('smembers','active')
-		local results = {}
-		table.foreach(active_games, function(k,v)
-			local z = redis.call('get',v)
-			if z then
-				table.insert(results, v)
-				table.insert(results, redis.call('ttl',v))
-				table.insert(results, z)
-			end
-		end)
-		return results/, 0] => func($redis, $res) {
+	$redis->execute(eval => [$gamelist_lua, 0] => func($redis, $res) {
 			my $text = '';
 			my $id = 0;
 			while (scalar @$res) {
